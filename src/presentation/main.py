@@ -1,6 +1,8 @@
 import os
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from strawberry.fastapi import GraphQLRouter
+
 from src.infrastructure.database import init_database
 from src.presentation.graphql.schema import schema
 from src.presentation.routers.auth import router as auth_router
@@ -13,6 +15,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
 @app.on_event("startup")
 async def startup_event():
     database_url = os.getenv(
@@ -21,8 +24,19 @@ async def startup_event():
     init_database(database_url)
     print(f"✅ Database manager initialized with URL: {database_url}")
 
+
 # GraphQL router simple
 graphql_app = GraphQLRouter(schema)
+
+
+async def get_context(request: Request):
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+
+    return {"token": token}
+
 
 app.include_router(graphql_app, prefix="/graphql", include_in_schema=True)
 
@@ -31,9 +45,11 @@ app.include_router(auth_router)
 app.include_router(task_list_router)
 app.include_router(task_router)
 
+
 @app.get("/ping")
 def ping():
     return {"message": "pong"}
+
 
 @app.get("/")
 def root():

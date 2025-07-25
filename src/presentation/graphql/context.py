@@ -2,35 +2,48 @@ from typing import Optional
 
 from strawberry.types import Info
 
-from src.application.auth_service import get_current_user
+from src.infrastructure.auth import decode_access_token
 from src.infrastructure.database import SessionLocal, UserModel
 
 
 def get_db():
     """Get database session - reusing REST logic"""
-    db = SessionLocal()
-    try:
-        return db
-    finally:
-        db.close()
+    return SessionLocal()
 
 
 def get_current_user_from_context(info: Info) -> Optional[UserModel]:
-    """Get current user from context"""
-    if hasattr(info.context, "get") and info.context.get("user"):
-        return info.context["user"]
+    if not hasattr(info.context, "get"):
+        return None
 
-    # Temporalmente deshabilitado hasta arreglar el context
-    # TODO: Implementar autenticación GraphQL correctamente
-    return None
+    token = info.context.get("token")
+    if not token:
+        return None
+
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+
+        db = SessionLocal()
+        user = db.query(UserModel).filter(UserModel.id == int(user_id)).first()
+        db.close()
+        return user
+    except Exception as e:
+        print(f"⚠️ Error decoding token in context: {e}")
+        return None
 
 
-def require_auth(info: Info) -> UserModel:
-    """
-    Require authentication - raises exception if not authenticated
-    GraphQL best practice for protected resolvers
-    """
-    user = get_current_user_from_context(info)
-    if not user:
-        raise Exception("Authentication required. Please provide a valid Bearer token.")
-    return user
+def require_auth(info):
+    headers = info.context["request"].headers
+    token = headers.get("authorization", "").replace("Bearer ", "")
+
+    payload = decode_access_token(token)
+    user_id = payload.get("sub")
+
+    db = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
+        return user
+    finally:
+        db.close()

@@ -299,7 +299,7 @@ class TaskMutation:
         try:
             task = (
                 db.query(TaskModel)
-                .join(TaskListModel)
+                .join(TaskListModel, TaskModel.task_list_id == TaskListModel.id)
                 .filter(TaskModel.id == id, TaskListModel.owner_id == user.id)
                 .first()
             )

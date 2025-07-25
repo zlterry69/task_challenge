@@ -42,7 +42,11 @@ def mock_task_model():
 
 @pytest.fixture
 def mock_context(mock_user_model):
-    return {"user": mock_user_model, "db": AsyncMock()}
+    headers = MagicMock()
+    headers.get.return_value = "Bearer test_token"
+    request = MagicMock()
+    request.headers = headers
+    return {"user": mock_user_model, "db": AsyncMock(), "request": request}
 
 
 @pytest.fixture
@@ -53,7 +57,9 @@ def mock_info(mock_context):
 
 
 @pytest.mark.asyncio
-async def test_auth_query_me(mock_info, mock_user_model):
+@patch("src.presentation.graphql.resolvers.auth_resolvers.require_auth")
+async def test_auth_query_me(mock_require_auth, mock_info, mock_user_model):
+    mock_require_auth.return_value = mock_user_model
     query = AuthQuery()
     # El método me no es async, no usar await
     result = query.me(info=mock_info)

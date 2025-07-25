@@ -58,18 +58,26 @@ class GraphQLAPITester:
             })
     
     def execute_graphql(self, query: str, variables: dict = None):
-        """Execute a GraphQL query/mutation"""
+        """Execute a GraphQL query/mutation with token if available"""
         payload = {
             "query": query,
             "variables": variables or {}
         }
-        
-        response = self.session.post(
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        if self.access_token:
+            headers["Authorization"] = f"Bearer {self.access_token}"  # 🔹 Forzado siempre
+
+        response = requests.post(  # 👈 Usar requests.post en lugar de self.session.post
             GRAPHQL_ENDPOINT,
-            json=payload
+            json=payload,
+            headers=headers
         )
-        
         return response
+
     
     def test_user_registration(self):
         print_test("User Registration (GraphQL)")
